@@ -3,7 +3,9 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\StockMovementController;
 use App\Http\Controllers\TripController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -29,4 +31,8 @@ Route::group(["prefix" => "admin", "middleware" => ["auth", "adminCheck"], "as" 
     Route::put('/users', [UserController::class, 'updateSingleUser']);
     Route::view('/settings', 'admin.settings');
     Route::put('/settings', [UserController::class, 'update']);
+    Route::resource('/items', ItemController::class)->only('index', 'store', 'destroy');
+    Route::get('/inventory/all', [StockMovementController::class, 'all']);
+    Route::get('/inventory/in', [StockMovementController::class, 'in']);
+    Route::get('/inventory/out', [StockMovementController::class, 'out']);
 });
