@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ItemRequest;
+use App\Models\Hardware;
 use App\Models\Item;
 
 class ItemController extends Controller
@@ -16,6 +17,12 @@ class ItemController extends Controller
         return view('admin.items', compact('items'));
     }
 
+    public function showSensorDatas()
+    {
+        $sensorDatas = Hardware::latest()->paginate(10);
+        return view('admin.sensor-values', compact('sensorDatas'));
+    }
+
     /**
      * Store a newly created resource in storage.
      */
@@ -23,7 +30,8 @@ class ItemController extends Controller
     {
         Item::create([
             'name' => $request->input('name'),
-            'code' => $request->input('code'),
+            'uid' => $request->input('uid'),
+            'qty' => $request->input('qty'),
             'unit' => $request->input('unit'),
             'description' => $request->input('description'),
         ]);

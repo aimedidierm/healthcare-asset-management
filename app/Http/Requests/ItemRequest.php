@@ -23,7 +23,8 @@ class ItemRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:20',
-            'code' => 'required|string|max:10|unique:items,code',
+            'uid' => 'required|string|max:10|unique:items,uid',
+            'qty' => 'required|numeric|min:1',
             'unit' => 'required|string|max:20',
             'description' => 'nullable|string|max:20',
         ];

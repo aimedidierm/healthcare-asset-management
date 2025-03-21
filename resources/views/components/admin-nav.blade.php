@@ -36,6 +36,15 @@
                 </a>
             </li>
             <li>
+                <a href="/admin/sensor-values"
+                    class="flex items-center p-2 text-gray-900 rounded-lg dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 group">
+                    <span class="material-symbols-outlined">
+                        sensors
+                    </span>
+                    <span class="flex-1 ml-3 whitespace-nowrap">Sensor Values</span>
+                </a>
+            </li>
+            <li>
                 <button type="button"
                     class="flex items-center w-full p-2 text-base text-gray-900 transition duration-75 rounded-lg group hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
                     aria-controls="dropdown-example" data-collapse-toggle="dropdown-example">

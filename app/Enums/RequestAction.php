@@ -4,6 +4,6 @@ namespace App\Enums;
 
 enum RequestAction: string
 {
-    case ADD = 'Add';
-    case REMOVE = 'Remove';
+    case ADD = 'ADD';
+    case REMOVE = 'REMOVE';
 }

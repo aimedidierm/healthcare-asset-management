@@ -45,9 +45,9 @@
                                 required>
                         </div>
                         <div class="mb-6">
-                            <label for="code" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
-                                Code</label>
-                            <input type="text" id="code" name="code"
+                            <label for="qty" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                QTY</label>
+                            <input type="number" id="qty" name="qty"
                                 class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                 required>
                         </div>
@@ -55,6 +55,13 @@
                             <label for="unit" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
                                 Unit</label>
                             <input type="text" id="unit" name="unit"
+                                class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                required>
+                        </div>
+                        <div class="mb-6">
+                            <label for="uid" class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">
+                                UID (Tag ID)</label>
+                            <input type="text" id="uid" name="uid"
                                 class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
                                 required>
                         </div>
@@ -68,7 +75,7 @@
                         <br>
                         <button type="submit"
                             class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm w-full sm:w-auto px-5 py-2.5 text-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">Create
-                            Client
+                            Item
                         </button>
                     </form>
                 </div>
@@ -83,7 +90,10 @@
                         Name
                     </th>
                     <th scope="col" class="px-6 py-3">
-                        Code
+                        UID
+                    </th>
+                    <th scope="col" class="px-6 py-3">
+                        QTY
                     </th>
                     <th scope="col" class="px-6 py-3">
                         Unit
@@ -96,7 +106,7 @@
             <tbody>
                 @if ($items->isEmpty())
                 <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700">
-                    <th scope="row" colspan="4"
+                    <th scope="row" colspan="6"
                         class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                         No data available
                     </th>
@@ -108,7 +118,10 @@
                         {{$item->name}}
                     </th>
                     <td class="px-6 py-4">
-                        {{$item->code}}
+                        {{$item->uid}}
+                    </td>
+                    <td class="px-6 py-4">
+                        {{$item->qty}}
                     </td>
                     <td class="px-6 py-4">
                         {{$item->unit}}

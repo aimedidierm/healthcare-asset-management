@@ -30,6 +30,7 @@ Route::group(["prefix" => "admin", "middleware" => ["auth", "adminCheck"], "as" 
     Route::resource('/users', UserController::class)->only('index');
     Route::put('/users', [UserController::class, 'updateSingleUser']);
     Route::view('/settings', 'admin.settings');
+    Route::get('/sensor-values', [ItemController::class, 'showSensorDatas']);
     Route::put('/settings', [UserController::class, 'update']);
     Route::resource('/items', ItemController::class)->only('index', 'store', 'destroy');
     Route::get('/inventory/all', [StockMovementController::class, 'all']);

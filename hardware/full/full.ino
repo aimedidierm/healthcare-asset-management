@@ -1,189 +1,236 @@
-#include <Arduino.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiClientSecureBearSSL.h>
-#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <ArduinoJson.h>
+#include <DHT.h>
 
+// Pin definitions
+#define SS_PIN 10
+#define RST_PIN 5
+#define STOCK_IN_PIN 7   // Previously SCAN_MODE_PIN
+#define STOCK_OUT_PIN 6  // Previously REMOVE_MODE_PIN
+#define BUZZER_PIN 8
+#define FAN 9
+#define DHT_PIN 4  
+#define DHT_TYPE DHT11  
 
-#define RST_PIN         D3
-#define SS_PIN          D4
-MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+// Initialize objects
+DHT dht(DHT_PIN, DHT_TYPE);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+MFRC522 rfid(SS_PIN, RST_PIN);
 
-const char* ssid = "Balance";
-const char* password = "balance123";
-int buzzerPin = D0;
-String content = "";
+// Mode flags
+bool scanMode = false;
+bool isStockIn = true;  // Default mode is stock in
 
+// Card structure
+struct Card {
+  byte uid[4];
+  char name[20];
+  int quantity;  // Added quantity field
+};
 
-void setup()
-{
+// Database of known cards
+Card knownCards[] = {
+  {{0xAA, 0x2, 0xBF, 0x43}, "AMOXILLIN", 10},
+  {{0x5B, 0x6C, 0xED, 0x3B}, "COARTEM", 5},
+  {{0x23, 0xEA, 0X69, 0XF5}, "PARASTAMOL", 8}
+};
+
+const int numCards = sizeof(knownCards) / sizeof(Card);
+
+void setup() {
   Serial.begin(9600);
   SPI.begin();
-  pinMode(buzzerPin, OUTPUT);
-  mfrc522.PCD_Init();
+  rfid.PCD_Init();
   lcd.init();
-  lcd.init();
-  lcd.clear();
   lcd.backlight();
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+  dht.begin();  
+  
+  pinMode(BUZZER_PIN, OUTPUT);
+  pinMode(STOCK_IN_PIN, INPUT_PULLUP);
+  pinMode(STOCK_OUT_PIN, INPUT_PULLUP);
+  pinMode(FAN, OUTPUT);
+  
+  lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Connecting to");
-  lcd.setCursor(0, 1);
-  lcd.print("WiFi network");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-  }
-  lcd.clear(),
-            lcd.print("System");
-  lcd.setCursor(0, 1);
-  lcd.print("Starting");
-  delay(1000);
-  lcd.clear(),
-            lcd.print("System");
-  lcd.setCursor(0, 1);
-  lcd.print("Ready");
-  delay(2000);
-  lcd.clear(),
-            lcd.print("System");
-  lcd.setCursor(0, 1);
-  lcd.print("Ready");
-  delay(3000);
-  lcd.clear(),
-            lcd.print("Kozaho ikarita");
-}
-void loop()
-{
-  readcard();
+  lcd.print("System Ready");
 }
 
-void readcard() {
-  if (!mfrc522.PICC_IsNewCardPresent()) {
-    return;
-  }
-  if (!mfrc522.PICC_ReadCardSerial()) {
-    return;
-  }
-  Serial.print("UID tag: ");
-  for (byte i = 0; i < mfrc522.uid.size; i++) {
-    content += (mfrc522.uid.uidByte[i] < 0x10 ? "0" : "");
-    content += String(mfrc522.uid.uidByte[i], HEX);
-  }
-  lcd.clear(),
-            lcd.print("Tegereza");
-  lcd.setCursor(0, 1);
-  lcd.print("Kureba amakuru");
-  updateStatus();
+void loop() {
+  // Check for stock in/out button press
+  checkStockButtons();
+  
+  // Monitor temperature and humidity
+  updateEnvironmentInfo();
+  
+  // If scan mode is off, don't proceed with RFID scanning
+  if (!scanMode) return;
+  
+  // Check for new RFID card
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) return;
+  
+  // Process the scanned card
+  processCard();
+  
+  // Stop RFID
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
 }
 
-void updateStatus() {
-  if (WiFi.status() == WL_CONNECTED) {
+void checkStockButtons() {
+  static bool lastInButtonState = HIGH;
+  static bool lastOutButtonState = HIGH;
+  
+  // Check Stock In button
+  bool inButtonState = digitalRead(STOCK_IN_PIN);
+  if (inButtonState == LOW && lastInButtonState == HIGH) {
+    scanMode = true;
+    isStockIn = true;
+    updateLcdStatus();
+    delay(300);
+  }
+  lastInButtonState = inButtonState;
+  
+  // Check Stock Out button
+  bool outButtonState = digitalRead(STOCK_OUT_PIN);
+  if (outButtonState == LOW && lastOutButtonState == HIGH) {
+    scanMode = true;
+    isStockIn = false;
+    updateLcdStatus();
+    delay(300);
+  }
+  lastOutButtonState = outButtonState;
+}
 
-    std::unique_ptr<BearSSL::WiFiClientSecure> client(new BearSSL::WiFiClientSecure);
+void updateLcdStatus() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  if (scanMode) {
+    lcd.print(isStockIn ? "Stock IN Mode" : "Stock OUT Mode");
+  } else {
+    lcd.print("Scan Mode OFF");
+  }
+  
+  // Log to serial for ESP8266
+  Serial.print("MODE:");
+  Serial.println(isStockIn ? "IN" : "OUT");
+}
 
-    // Ignore SSL certificate validation (for testing only)
-    client->setInsecure();
-    HTTPClient http;
-
-    Serial.println("[HTTPS] begin...");
-
-    if (http.begin(*client, "https://ruth.itaratec.com/api/status")) {  // HTTPS
-      Serial.println(content);
-      Serial.println("[HTTPS] POST...");
-
-      http.addHeader("Content-Type", "application/json");
-
-      DynamicJsonDocument jsonDoc(128); // Adjust the buffer size as needed
-
-      jsonDoc["card"] = content;
-
-      String jsonPayload;
-      serializeJson(jsonDoc, jsonPayload);
-
-      // Send the POST request with the JSON payload
-      int httpCode = http.POST(jsonPayload);
-
-      // Check the HTTP response code
-      if (httpCode > 0) {
-        content = "";
-        Serial.printf("[HTTPS] POST... code: %d\n", httpCode);
-
-        // Read and print the response from the server
-        String payload = http.getString();
-        Serial.println(payload);
-        DynamicJsonDocument doc(512); // Adjust the size based on your payload size
-        DeserializationError error = deserializeJson(doc, payload);
-
-        // Check for parsing errors
-        if (error) {
-          Serial.print(F("Error parsing JSON: "));
-          Serial.println(error.c_str());
-        } else {
-          // Access JSON data
-          bool cardAllowed = doc["card_allowed"];
-          String message = doc["message"];
-
-          if (cardAllowed == true)
-          {
-            lcd.clear(),
-                      lcd.print("Uremerewe!");
-            lcd.setCursor(0, 1);
-            lcd.print(message);
-            playBeep(1000, 500);
-            delay(3000);
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Kozaho ikarita");
-            readcard();
-          }
-          else {
-            lcd.clear(),
-                      lcd.print("Ikibazo");
-            lcd.setCursor(0, 1);
-            lcd.print(message);
-            playAlarm();
-            delay(3000);
-            lcd.clear();
-            lcd.setCursor(0, 0);
-            lcd.print("Kozaho ikarita");
-            readcard();
-          }
-        }
-      } else {
-        content = "";
-        Serial.printf("[HTTPS] POST... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        lcd.clear(),
-                  lcd.print("Ntibikunze");
-        delay(3000);
-        readcard();
-      }
-
-      // End the HTTP connection
-      http.end();
+void updateEnvironmentInfo() {
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+  
+  lcd.setCursor(0, 1);
+  if (!isnan(temperature) && !isnan(humidity)) {
+    lcd.print("T:"); lcd.print(temperature); lcd.print("C ");
+    lcd.print("H:"); lcd.print(humidity); lcd.print("%");
+    
+    // Control fan based on temperature
+    if (temperature > 28) {
+      digitalWrite(FAN, HIGH);
     } else {
-      Serial.println("[HTTPS] Unable to connect");
-      lcd.clear(),
-                lcd.print("Guhuza ntibikunze");
-      delay(3000);
-      readcard();
+      digitalWrite(FAN, LOW);
+    }
+    
+    // Send environment data to ESP8266 every 10 seconds
+    static unsigned long lastSent = 0;
+    if (millis() - lastSent > 10000) {
+      Serial.print("ENV:");
+      Serial.print(temperature);
+      Serial.print(",");
+      Serial.println(humidity);
+      lastSent = millis();
+    }
+  } else {
+    lcd.print("Sensor Error!");
+  }
+}
+
+void processCard() {
+  // Print UID to serial
+  String uidString = "";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    uidString += String(rfid.uid.uidByte[i], HEX);
+    if (i < rfid.uid.size - 1) uidString += ":";
+  }
+  
+  // Check if card is recognized
+  int cardIndex = -1;
+  for (int i = 0; i < numCards; i++) {
+    if (memcmp(rfid.uid.uidByte, knownCards[i].uid, 4) == 0) {
+      cardIndex = i;
+      break;
     }
   }
+  
+  // Process the card
+  if (cardIndex >= 0) {
+    // Known card
+    if (isStockIn) {
+      // Stock In operation
+      knownCards[cardIndex].quantity++;
+      displayCardInfo(cardIndex, "IN");
+      beep(1);
+    } else {
+      // Stock Out operation
+      if (knownCards[cardIndex].quantity > 0) {
+        knownCards[cardIndex].quantity--;
+        displayCardInfo(cardIndex, "OUT");
+        beep(2);
+      } else {
+        // Out of stock
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print(knownCards[cardIndex].name);
+        lcd.setCursor(0, 1);
+        lcd.print("OUT OF STOCK!");
+        beep(3);
+      }
+    }
+    
+    // Send data to ESP8266
+    Serial.print("CARD:");
+    Serial.print(uidString);
+    Serial.print(",");
+    Serial.print(knownCards[cardIndex].name);
+    Serial.print(",");
+    Serial.print(isStockIn ? "IN" : "OUT");
+    Serial.print(",");
+    Serial.println(knownCards[cardIndex].quantity);
+    
+  } else {
+    // Unknown card
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Unknown Card");
+    lcd.setCursor(0, 1);
+    lcd.print(uidString);
+    beep(3);
+    
+    // Send unknown card data
+    Serial.print("UNKNOWN:");
+    Serial.println(uidString);
+  }
+  
+  delay(2000);
+  updateLcdStatus();
 }
 
-void playBeep(int frequency, int duration) {
-  tone(buzzerPin, frequency, duration);
-  delay(duration);
-  noTone(buzzerPin);
+void displayCardInfo(int index, String action) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(knownCards[index].name);
+  lcd.setCursor(0, 1);
+  lcd.print(action);
+  lcd.print(" | Qty: ");
+  lcd.print(knownCards[index].quantity);
 }
 
-void playAlarm() {
-  for (int i = 0; i < 3; i++) {
-    playBeep(1000, 200);
+void beep(int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
     delay(200);
+    digitalWrite(BUZZER_PIN, LOW);
+    if (i < times - 1) delay(200);
   }
 }

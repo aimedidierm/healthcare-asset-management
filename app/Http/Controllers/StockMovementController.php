@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\StockMovementType;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 
@@ -9,19 +10,25 @@ class StockMovementController extends Controller
 {
     public function all()
     {
-        $movements = StockMovement::latest()->with('product')->paginate(10);
+        $movements = StockMovement::latest()->with('item')->paginate(10);
         return view('admin.stock.all', compact('movements'));
     }
 
     public function in()
     {
-        $movements = StockMovement::latest()->with('product')->paginate(10);
+        $movements = StockMovement::latest()
+            ->where('type', StockMovementType::Addition->value)
+            ->with('item')
+            ->paginate(10);
         return view('admin.stock.in', compact('movements'));
     }
 
     public function out()
     {
-        $movements = StockMovement::latest()->with('product')->paginate(10);
+        $movements = StockMovement::latest()
+            ->where('type', StockMovementType::Deduction->value)
+            ->with('item')
+            ->paginate(10);
         return view('admin.stock.out', compact('movements'));
     }
 
