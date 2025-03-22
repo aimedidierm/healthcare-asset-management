@@ -2,6 +2,7 @@
 #include <MFRC522.h>
 #include <LiquidCrystal_I2C.h>
 #include <DHT.h>
+#include <ArduinoJson.h>
 
 // Pin definitions
 #define SS_PIN 10
@@ -21,22 +22,6 @@ MFRC522 rfid(SS_PIN, RST_PIN);
 // Mode flags
 bool scanMode = false;
 bool isStockIn = true;  // Default mode is stock in
-
-// Card structure
-struct Card {
-  byte uid[4];
-  char name[20];
-  int quantity;  // Added quantity field
-};
-
-// Database of known cards
-Card knownCards[] = {
-  {{0xAA, 0x2, 0xBF, 0x43}, "AMOXILLIN", 10},
-  {{0x5B, 0x6C, 0xED, 0x3B}, "COARTEM", 5},
-  {{0x23, 0xEA, 0X69, 0XF5}, "PARASTAMOL", 8}
-};
-
-const int numCards = sizeof(knownCards) / sizeof(Card);
 
 void setup() {
   Serial.begin(9600);
@@ -111,7 +96,6 @@ void updateLcdStatus() {
     lcd.print("Scan Mode OFF");
   }
   
-  // Log to serial for ESP8266
   Serial.print("MODE:");
   Serial.println(isStockIn ? "IN" : "OUT");
 }
@@ -125,14 +109,12 @@ void updateEnvironmentInfo() {
     lcd.print("T:"); lcd.print(temperature); lcd.print("C ");
     lcd.print("H:"); lcd.print(humidity); lcd.print("%");
     
-    // Control fan based on temperature
     if (temperature > 28) {
       digitalWrite(FAN, HIGH);
     } else {
       digitalWrite(FAN, LOW);
     }
     
-    // Send environment data to ESP8266 every 10 seconds
     static unsigned long lastSent = 0;
     if (millis() - lastSent > 10000) {
       Serial.print("ENV:");
@@ -149,81 +131,71 @@ void updateEnvironmentInfo() {
 void processCard() {
   // Print UID to serial
   String uidString = "";
+  
   for (byte i = 0; i < rfid.uid.size; i++) {
     uidString += String(rfid.uid.uidByte[i], HEX);
-    if (i < rfid.uid.size - 1) uidString += ":";
   }
-  
-  // Check if card is recognized
-  int cardIndex = -1;
-  for (int i = 0; i < numCards; i++) {
-    if (memcmp(rfid.uid.uidByte, knownCards[i].uid, 4) == 0) {
-      cardIndex = i;
-      break;
+
+  beep(2);
+
+  // Send data to ESP8266
+  Serial.print("CARD:");
+  Serial.print(uidString);
+  Serial.print(",");
+  Serial.println(isStockIn ? "ADD" : "REMOVE");
+
+  String response = "";
+
+  while (Serial.available()) {
+    response += (char)Serial.read();  // Read response from ESP8266
+  }
+
+  if (response.length() > 0) {
+
+    // Parse the JSON response from the ESP8266 (which is from the server)
+    DynamicJsonDocument responseDoc(1024);
+    DeserializationError error = deserializeJson(responseDoc, response);
+
+    if (error) {
+      Serial.print("Error parsing JSON: ");
+      Serial.println(error.f_str());
+      return;
+    }
+
+    // Retrieve values from the JSON response
+    const char* status = responseDoc["status"];
+    const char* message = responseDoc["message"];
+
+    if (strcmp(status, "1") == 0) {
+      handleResponseMessage(message);
+    } else if (strcmp(status, "0") == 0) {
+      handleResponseError(message);
     }
   }
-  
-  // Process the card
-  if (cardIndex >= 0) {
-    // Known card
-    if (isStockIn) {
-      // Stock In operation
-      knownCards[cardIndex].quantity++;
-      displayCardInfo(cardIndex, "IN");
-      beep(1);
-    } else {
-      // Stock Out operation
-      if (knownCards[cardIndex].quantity > 0) {
-        knownCards[cardIndex].quantity--;
-        displayCardInfo(cardIndex, "OUT");
-        beep(2);
-      } else {
-        // Out of stock
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print(knownCards[cardIndex].name);
-        lcd.setCursor(0, 1);
-        lcd.print("OUT OF STOCK!");
-        beep(3);
-      }
-    }
-    
-    // Send data to ESP8266
-    Serial.print("CARD:");
-    Serial.print(uidString);
-    Serial.print(",");
-    Serial.print(knownCards[cardIndex].name);
-    Serial.print(",");
-    Serial.print(isStockIn ? "IN" : "OUT");
-    Serial.print(",");
-    Serial.println(knownCards[cardIndex].quantity);
-    
-  } else {
-    // Unknown card
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Unknown Card");
-    lcd.setCursor(0, 1);
-    lcd.print(uidString);
-    beep(3);
-    
-    // Send unknown card data
-    Serial.print("UNKNOWN:");
-    Serial.println(uidString);
-  }
-  
-  delay(2000);
+
+  delay(2000); // Delay before sending the next request
+
   updateLcdStatus();
 }
 
-void displayCardInfo(int index, String action) {
+void handleResponseError(String message) {
+  beep(6);
   lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print(knownCards[index].name);
+  lcd.setCursor(0,0);
+  lcd.print("Error");
   lcd.setCursor(0, 1);
-  lcd.print(action);
-  lcd.print(" | Qty: ");
-  lcd.print(knownCards[index].quantity);
+  lcd.println(message);
+  delay(3000);
+  restartCircuit();
+}
+
+void handleResponseMessage(String message) {
+  beep(4);
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.println(message);
+  delay(3000);
+  restartCircuit();
 }
 
 void beep(int times) {
@@ -233,4 +205,12 @@ void beep(int times) {
     digitalWrite(BUZZER_PIN, LOW);
     if (i < times - 1) delay(200);
   }
+}
+
+void restartCircuit() {
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Restarting ...");
+  delay(1000);
+  asm volatile ("  jmp 0");
 }

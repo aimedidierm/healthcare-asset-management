@@ -10,12 +10,14 @@ use App\Http\Requests\ItemStockRequest;
 use App\Models\Hardware;
 use App\Models\Item;
 use App\Models\StockMovement;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class HardwareController extends Controller
 {
     public function show(HardwareRequest $request)
     {
+        Log::info('This is an informational log message.' . $request);
         if ($request->has('temperature')) {
 
             Hardware::create([
@@ -31,6 +33,7 @@ class HardwareController extends Controller
 
         if ($request->has('uid')) {
 
+            Log::info('This is an informational log message.' . $request);
             if ($request->action == RequestAction::ADD->value) {
                 $item = Item::where('uid', $request->input('uid'))->first();
                 if ($item) {
