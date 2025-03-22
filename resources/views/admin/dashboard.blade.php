@@ -8,12 +8,12 @@
         <div class="max-w-full mx-auto bg-white rounded p-6 shadow-md">
             <div class="mb-4">
                 <h6 class="text-lg font-semibold text-gray-700">Temperature:</h6>
-                <p class="text-xl text-gray-900">{{$sensorData->temperature}}°C </p>
+                <p class="text-xl text-gray-900">{{$sensorData->temperature ?? 'N/A'}}°C </p>
             </div>
 
             <div>
                 <h6 class="text-lg font-semibold text-gray-700">Humidity:</h6>
-                <p class="text-xl text-gray-900">{{$sensorData->temperature}}%</p>
+                <p class="text-xl text-gray-900">{{$sensorData->temperature?? 'N/A'}}%</p>
             </div>
         </div>
     </div>
