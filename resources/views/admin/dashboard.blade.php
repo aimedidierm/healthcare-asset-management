@@ -13,7 +13,7 @@
 
             <div>
                 <h6 class="text-lg font-semibold text-gray-700">Humidity:</h6>
-                <p class="text-xl text-gray-900">{{$sensorData->temperature?? 'N/A'}}%</p>
+                <p class="text-xl text-gray-900">{{$sensorData->humidity?? 'N/A'}}%</p>
             </div>
         </div>
     </div>
